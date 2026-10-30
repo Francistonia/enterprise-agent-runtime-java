@@ -1,0 +1,50 @@
+spring:
+  profiles:
+    default: local
+  datasource:
+    url: ${RUNTIME_DB_URL:jdbc:h2:file:./.runtime/control;MODE=MySQL;DATABASE_TO_LOWER=TRUE}
+    username: ${RUNTIME_DB_USER:sa}
+    password: ${RUNTIME_DB_PASSWORD:}
+  sql:
+    init:
+      mode: always
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+server:
+  address: ${RUNTIME_BIND:127.0.0.1}
+  port: ${PORT:8080}
+  shutdown: graceful
+  tomcat:
+    max-http-form-post-size: 2MB
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+runtime:
+  model-provider: ${AGENT_MODEL_PROVIDER:ark}
+  model: ${AGENT_MODEL:ark-code-latest}
+  model-base-url: ${ARK_BASE_URL:https://ark.cn-beijing.volces.com/api/coding/v3}
+  allowed-origins: ${RUNTIME_ALLOWED_ORIGINS:http://127.0.0.1:8081,http://127.0.0.1:18080,https://open.feishu.cn}
+  run-timeout-seconds: 180
+  embedding:
+    mode: http
+    url: ${EMBEDDING_URL:}
+    model: ${EMBEDDING_MODEL:text-embedding-v3}
+    dimensions: ${EMBEDDING_DIMENSIONS:1024}
+    token-env: RUNTIME_SECRET_EMBEDDING
+  vector:
+    mode: jdbc
+  sandbox:
+    enabled: ${SANDBOX_ENABLED:false}
+    worker-url: ${SANDBOX_WORKER_URL:}
+    image: ${SANDBOX_IMAGE:python:3.12-slim}
+    max-seconds: 30
+    max-output-bytes: 65536
+  oidc:
+    issuer: ${OIDC_ISSUER:}
+    audience: ${OIDC_AUDIENCE:agent-runtime}
+logging:
+  level:
+    io.agentscope: WARN

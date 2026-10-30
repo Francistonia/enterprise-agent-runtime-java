@@ -1,0 +1,147 @@
+name: enterprise-agent-runtime
+services:
+  oceanbase:
+    image: ghcr.io/oceanbase/oceanbase-ce:4.4.1.0-100000032025101610
+    entrypoint: ["/bin/bash","/runtime-oceanbase-entrypoint.sh"]
+    environment:
+      MODE: mini
+      OB_CLUSTER_NAME: runtime
+      OB_TENANT_NAME: runtime
+      OB_DATABASE: agent_runtime
+      OB_MEMORY_LIMIT: 5G
+      OB_SYSTEM_MEMORY: 1G
+      OB_TENANT_MEMORY_SIZE: 2G
+      OB_TENANT_MIN_CPU: "1"
+      OB_TENANT_LOG_DISK_SIZE: 2G
+      OB_DATAFILE_SIZE: 5G
+      OB_LOG_DISK_SIZE: 5G
+      OB_TENANT_PASSWORD: ${LOCAL_DB_PASSWORD}
+    ports: ["127.0.0.1:12881:2881"]
+    mem_limit: 5632m
+    volumes:
+      - oceanbase-data:/root/ob
+      - oceanbase-config:/root/.obd/cluster
+      - ../.runtime/oceanbase-init:/root/boot/init.d:ro
+      - ./oceanbase-entrypoint.sh:/runtime-oceanbase-entrypoint.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL","obclient -h127.0.0.1 -P2881 -uroot@runtime -p$$OB_TENANT_PASSWORD -Dagent_runtime -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+    restart: unless-stopped
+  embedding:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
+    command: ["--model-id","/model","--pooling","cls","--auto-truncate","--max-client-batch-size","16"]
+    ports: ["127.0.0.1:18083:80"]
+    mem_limit: 768m
+    volumes: ["../.runtime/models/bge-small:/model:ro"]
+    restart: unless-stopped
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${LOCAL_DB_PASSWORD}
+      MYSQL_DATABASE: rag_flow
+    command: ["--innodb-buffer-pool-size=128M","--max-connections=100","--character-set-server=utf8mb4"]
+    volumes: ["ragflow-mysql:/var/lib/mysql"]
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL","mysqladmin ping -h127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+  minio:
+    image: pgsty/silo:RELEASE.2026-08-06T00-00-00Z
+    command: ["server","/data"]
+    environment:
+      MINIO_ROOT_USER: runtime
+      MINIO_ROOT_PASSWORD: ${LOCAL_STORAGE_PASSWORD}
+      GOMEMLIMIT: 192MiB
+    volumes: ["ragflow-files:/data"]
+    mem_limit: 256m
+    restart: unless-stopped
+  kvrocks:
+    image: apache/kvrocks:2.16.0
+    user: "0:0"
+    entrypoint: ["/bin/sh","/entrypoint-runtime.sh"]
+    environment:
+      REDIS_PASSWORD: ${LOCAL_STORAGE_PASSWORD}
+    volumes:
+      - ragflow-cache:/var/lib/kvrocks
+      - ./kvrocks-entrypoint.sh:/entrypoint-runtime.sh:ro
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL","redis-cli -a $$REDIS_PASSWORD ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+  nats:
+    image: nats:2.14.2
+    command: ["-js","-sd","/data"]
+    volumes: ["ragflow-queue:/data"]
+    mem_limit: 64m
+    restart: unless-stopped
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.23
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes: ["ragflow-search:/usr/share/elasticsearch/data"]
+    mem_limit: 1024m
+    healthcheck:
+      test: ["CMD-SHELL","curl -fsS http://localhost:9200/_cluster/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+    restart: unless-stopped
+  ragflow:
+    image: infiniflow/ragflow:v1.0.0-rc2
+    command: ["--enable-adminserver","--init-superuser","--disable-syncer"]
+    environment:
+      DOC_ENGINE: elasticsearch
+      DB_TYPE: mysql
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_DBNAME: rag_flow
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${LOCAL_DB_PASSWORD}
+      OCEANBASE_HOST: oceanbase
+      OCEANBASE_PORT: "2881"
+      OCEANBASE_USER: root@runtime
+      OCEANBASE_PASSWORD: ${LOCAL_DB_PASSWORD}
+      OCEANBASE_DOC_DBNAME: ragflow_doc
+      MINIO_HOST: minio
+      MINIO_USER: runtime
+      MINIO_PASSWORD: ${LOCAL_STORAGE_PASSWORD}
+      KVROCKS_HOST: kvrocks
+      KVROCKS_PORT: "6379"
+      REDIS_PASSWORD: ${LOCAL_STORAGE_PASSWORD}
+      NATS_HOST: nats
+      NATS_PORT: "4222"
+      DEFAULT_SUPERUSER_EMAIL: admin@runtime.local
+      DEFAULT_SUPERUSER_PASSWORD: ${LOCAL_ADMIN_PASSWORD}
+      ADMIN_DEFAULT_PASSWORD: ${LOCAL_ADMIN_PASSWORD}
+      ALLOW_ANY_HOST: "true"
+      RAGFLOW_INGESTOR_MAX_CONCURRENT_WORKERS: "1"
+      RAGFLOW_INGESTOR_PAGE_CONCURRENCY: "1"
+    ports: ["127.0.0.1:18082:80"]
+    volumes: ["./ragflow-service.yaml.template:/ragflow/conf/service_conf.yaml.template:ro"]
+    mem_limit: 1536m
+    depends_on:
+      oceanbase: {condition: service_healthy}
+      mysql: {condition: service_healthy}
+      minio: {condition: service_started}
+      kvrocks: {condition: service_started}
+      nats: {condition: service_started}
+      elasticsearch: {condition: service_healthy}
+    restart: unless-stopped
+volumes:
+  oceanbase-data:
+  oceanbase-config:
+  ragflow-mysql:
+  ragflow-files:
+  ragflow-cache:
+  ragflow-queue:
+  ragflow-search:

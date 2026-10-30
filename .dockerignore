@@ -1,0 +1,5 @@
+.runtime
+.env
+target
+*.log
+.git

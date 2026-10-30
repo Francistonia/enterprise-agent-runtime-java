@@ -1,0 +1,5 @@
+# Local development only. Production uses the prod profile and OIDC.
+runtime:
+  embedding:
+    mode: fingerprint
+    dimensions: 128

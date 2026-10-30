@@ -1,0 +1,20 @@
+spring:
+  profiles:
+    active: sandbox-worker
+  datasource:
+    url: ${WORKER_DB_URL:jdbc:h2:file:./.runtime/worker;MODE=MySQL;DATABASE_TO_LOWER=TRUE}
+    username: sa
+    password: ${WORKER_DB_PASSWORD:}
+  sql:
+    init:
+      mode: always
+server:
+  address: ${WORKER_BIND:127.0.0.1}
+  port: ${WORKER_PORT:8082}
+runtime:
+  allowed-origins: ""
+  sandbox:
+    enabled: true
+    image: ${SANDBOX_IMAGE:python:3.12-slim}
+    max-seconds: 30
+    max-output-bytes: 65536

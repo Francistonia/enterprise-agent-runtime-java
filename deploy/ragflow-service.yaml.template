@@ -1,0 +1,51 @@
+general:
+  heartbeat_interval: 3s
+api:
+  host: 0.0.0.0
+  http_port: 9380
+admin:
+  host: 0.0.0.0
+  http_port: 9381
+mysql:
+  name: rag_flow
+  user: root
+  password: '${MYSQL_PASSWORD}'
+  host: mysql
+  port: 3306
+  max_connections: 30
+minio:
+  user: runtime
+  password: '${MINIO_PASSWORD}'
+  host: minio:9000
+oceanbase:
+  scheme: oceanbase
+  config:
+    db_name: ragflow_doc
+    user: root@runtime
+    password: '${OCEANBASE_PASSWORD}'
+    host: oceanbase
+    port: 2881
+kvrocks:
+  db: 1
+  password: '${REDIS_PASSWORD}'
+  host: kvrocks:6379
+nats:
+  host: nats
+  port: 4222
+es:
+  hosts: http://elasticsearch:9200
+  username: ''
+  password: ''
+otel:
+  enable: false
+ingestor:
+  mq_type: nats
+  max_concurrent_workers: 1
+  page_concurrency: 1
+  compiler_pool_size: 0
+user_default_llm:
+  default_models:
+    embedding_model:
+      name: BAAI/bge-small-zh-v1.5
+      api_key: local-embedding
+      base_url: http://embedding:80

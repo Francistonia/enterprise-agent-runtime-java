@@ -1,0 +1,20 @@
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:12881/agent_runtime?useUnicode=true&characterEncoding=UTF-8
+    username: root@runtime
+    password: ${LOCAL_DB_PASSWORD}
+  sql:
+    init:
+      mode: never
+runtime:
+  allowed-origins: http://127.0.0.1:8081,http://127.0.0.1:18080,http://127.0.0.1:18082,http://127.0.0.1:18083,https://open.feishu.cn
+  vector:
+    mode: oceanbase
+  embedding:
+    mode: http
+    url: http://127.0.0.1:18083/v1/embeddings
+    model: BAAI/bge-small-zh-v1.5
+    dimensions: 512
+    request-dimensions: false
+  sandbox:
+    enabled: true
