@@ -22,6 +22,8 @@ SDK 内置的宿主机文件、shell、网页、动态技能和子 Agent 工具�
 
 ## 本机启动
 
+Windows 脚本需要 PowerShell 7（pwsh）、Java 17+、Maven 和 Docker Desktop。
+
 已有服务占用 8080 时，Runtime 使用 **18080**，不会停止已有容器。
 
 ### Docker 依赖栈
